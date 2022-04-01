@@ -1,12 +1,13 @@
 extern crate rand;
-#[macro_use]
 extern crate ff;
 use ff::*;
+use std::ops::*;
 
 #[derive(PrimeField)]
 #[PrimeFieldModulus = "21888242871839275222246405745257275088548364400416034343698204186575808495617"]
 #[PrimeFieldGenerator = "7"]
-pub struct Fr(FrRepr);
+#[PrimeFieldReprEndianness = "little"]
+pub struct Fr([u64; 4]);
 
 mod constants;
 
@@ -23,7 +24,7 @@ pub fn load_constants() -> Constants {
     for i in 0..c_str.len() {
         let mut cci: Vec<Fr> = Vec::new();
         for j in 0..c_str[i].len() {
-            let b: Fr = Fr::from_str(c_str[i][j]).unwrap();
+            let b: Fr = Fr::from_str_vartime(c_str[i][j]).unwrap();
             cci.push(b);
         }
         c.push(cci);
@@ -34,7 +35,7 @@ pub fn load_constants() -> Constants {
         for j in 0..m_str[i].len() {
             let mut mij: Vec<Fr> = Vec::new();
             for k in 0..m_str[i][j].len() {
-                let b: Fr = Fr::from_str(m_str[i][j][k]).unwrap();
+                let b: Fr = Fr::from_str_vartime(m_str[i][j][k]).unwrap();
                 mij.push(b);
             }
             mi.push(mij);
@@ -68,14 +69,14 @@ impl Poseidon {
         if i < n_rounds_f / 2 || i >= n_rounds_f / 2 + n_rounds_p {
             for j in 0..state.len() {
                 let aux = state[j];
-                state[j].square();
-                state[j].square();
+                state[j] = state[j].square();
+                state[j] = state[j].square();
                 state[j].mul_assign(&aux);
             }
         } else {
             let aux = state[0];
-            state[0].square();
-            state[0].square();
+            state[0] = state[0].square();
+            state[0] = state[0].square();
             state[0].mul_assign(&aux);
         }
     }
@@ -118,15 +119,31 @@ impl Poseidon {
 mod tests {
     use super::*;
 
+    fn to_hex<F: PrimeField>(el: &F) -> String {
+        let repr = el.to_repr();
+        let mut buf: Vec<u8> = Vec::from(repr.as_ref());
+        buf.reverse();
+
+        hex::encode(&buf)
+    }
+
+    impl Fr {
+        fn to_string(&self) -> String {
+            format!("Fr(0x{})", to_hex(self))
+        }
+    }
+
     #[test]
     fn test_ff() {
-        let a = Fr::from_repr(FrRepr::from(2)).unwrap();
+        let mut arr = <Fr as PrimeField>::Repr::default();
+        arr.as_mut()[0] = 2;
+        let a = Fr::from_repr(arr).unwrap();
         assert_eq!(
             "0000000000000000000000000000000000000000000000000000000000000002",
             to_hex(&a)
         );
 
-        let b: Fr = Fr::from_str(
+        let b: Fr = Fr::from_str_vartime(
             "21888242871839275222246405745257275088548364400416034343698204186575808495619",
         )
         .unwrap();
@@ -160,13 +177,13 @@ mod tests {
 
     #[test]
     fn test_hash() {
-        let b0: Fr = Fr::from_str("0").unwrap();
-        let b1: Fr = Fr::from_str("1").unwrap();
-        let b2: Fr = Fr::from_str("2").unwrap();
-        let b3: Fr = Fr::from_str("3").unwrap();
-        let b4: Fr = Fr::from_str("4").unwrap();
-        let b5: Fr = Fr::from_str("5").unwrap();
-        let b6: Fr = Fr::from_str("6").unwrap();
+        let b0: Fr = Fr::from_str_vartime("0").unwrap();
+        let b1: Fr = Fr::from_str_vartime("1").unwrap();
+        let b2: Fr = Fr::from_str_vartime("2").unwrap();
+        let b3: Fr = Fr::from_str_vartime("3").unwrap();
+        let b4: Fr = Fr::from_str_vartime("4").unwrap();
+        let b5: Fr = Fr::from_str_vartime("5").unwrap();
+        let b6: Fr = Fr::from_str_vartime("6").unwrap();
 
         let mut big_arr: Vec<Fr> = Vec::new();
         big_arr.push(b1.clone());
